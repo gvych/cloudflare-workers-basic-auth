@@ -12,6 +12,12 @@ const PASS = "secret"
 const CREDENTIALS_REGEXP = /^ *(?:[Bb][Aa][Ss][Ii][Cc]) +([A-Za-z0-9._~+/-]+=*) *$/
 
 /**
+ * RegExp for bearer token credentials
+ *
+ */
+const BEARER_TOKEN_REGEXP = /^ *(?:[Bb][Ee][Aa][Rr][Ee][Rr]) +([A-Za-z0-9._~+/-]+=*) *$/
+
+/**
  * RegExp for basic auth user/pass
  *
  * user-pass   = userid ":" password
@@ -28,6 +34,22 @@ const USER_PASS_REGEXP = /^([^:]*):(.*)$/
 const Credentials = function(name, pass) {
   this.name = name
   this.pass = pass
+}
+
+const checkBearerToken = function(string) {
+    if (typeof string !== 'string') {
+    return undefined
+  }
+
+  // parse header
+  const match = BEARER_TOKEN_REGEXP.exec(string)
+
+  if (!match) {
+    return undefined
+  }
+
+  // return credentials object
+  return true
 }
 
 /**
@@ -62,9 +84,10 @@ const unauthorizedResponse = function(body) {
   return new Response(
     body, {
       status: 401,
-      headers: {
+       headers: {
         "WWW-Authenticate": 'Basic realm="User Visible Realm"'
       }
+
     }
   )
 }
@@ -74,10 +97,17 @@ const unauthorizedResponse = function(body) {
  */
 
 async function handle(request) {
+  const bearer_authorization = checkBearerToken(request.headers.get("Authorization"))
+  if (bearer_authorization) {
+     return fetch(request)
+  }
+  
   const credentials = parseAuthHeader(request.headers.get("Authorization"))
-  if ( !credentials || credentials.name !== NAME ||  credentials.pass !== PASS) {
+  if ( !credentials || credentials.name !== NAME ||  credentials.pass !== PASS ) {
     return unauthorizedResponse("Unauthorized")
   } else {
+    request = new Request(request)
+    request.headers.delete("Authorization")
     return fetch(request)
   }
 }
